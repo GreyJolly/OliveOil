@@ -4,6 +4,8 @@
 #include <time.h>
 #include "file_system.h"
 
+#define MAXIMUM_SIZE = 538656; // At one time, this was calculated to be the maximum size 
+
 int main()
 {
 	printf("Started testing...\n");
@@ -11,8 +13,8 @@ int main()
 	clock_t beginningTime = clock();
 
     // Allocate a large enough memory block
-    size_t totalSize = sizeof(FileSystem) + MAX_BLOCKS * sizeof(int) + MAX_ENTRIES * sizeof(DirectoryEntry) + MAX_BLOCKS * BLOCK_SIZE;
-    void *memory = malloc(totalSize);
+
+    void *memory = malloc(MAXIMUM_SIZE);
 
     // Initialize the filesystem with the provided memory block
     FileSystem *fs = initializeFileSystem(memory, totalSize);
