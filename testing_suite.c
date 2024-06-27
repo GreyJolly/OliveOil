@@ -101,6 +101,11 @@ void testFileSystem()
 	if (fh1)
 	{
 		assertTest(write(fs, fh1, "Hello, World!", 13) == 13, "Write to 'file1.txt'");
+		attributes attr;
+
+		assertTest(getAttributes(fs, fh1, &attr) == 0, "Get attributes of 'file1.txt'");
+		printf("Size of 'file1.txt': %s\n", formatSize(attr.size));
+		
 		close(fh1);
 	}
 
@@ -138,7 +143,7 @@ void testFileSystem()
 	assertTest(eraseFile(fs, "file2.txt") == 0, "Erase file 'file2.txt'");
 	assertTest(eraseDir(fs, "dir1") == -1, "Erase directory 'dir1' (can't because it isn't empty)");
 	assertTest(eraseDir(fs, "dir2") == 0, "Erase directory 'dir2'");
-	
+
 	// List root directory again
 	printf("Listing root directory after erasures:\n");
 	listDir(fs);

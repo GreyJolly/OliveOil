@@ -20,22 +20,22 @@ struct DirectoryEntry
 {
 	char name[MAX_FILENAME_LENGTH];
 	EntryType type;
-	int startBlock;
+	int startBlock;				// Starting block of file
 	int size;
-	int parentIndex; // Index of the parent directory
+	int parentIndex;			// Index of the parent directory
 	time_t creationTimestamp;
 	time_t lastAccessTimestamp;
 };
 
 struct FileSystem
 {
-	int *table;				  // FAT table
-	DirectoryEntry *entries;  // Directory entries
-	char (*data)[BLOCK_SIZE]; // Data blocks as a 2D array
-	int entryCount;			  // How many entries currently present
-	int maxEntries;			  // How many entries at most
-	int totalBlocks;		  // How many blocks at most
-	int currentDirIndex;	  // Index of the current directory
+	int *table;					// FAT table
+	DirectoryEntry *entries;	// Directory entries
+	char (*data)[BLOCK_SIZE];	// Data blocks as a 2D array
+	int entryCount;				// How many entries currently present
+	int maxEntries;				// How many entries at most
+	int totalBlocks;			// How many blocks at most
+	int currentDirIndex;		// Index of the current directory
 };
 
 struct FileHandle
@@ -347,6 +347,17 @@ int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 	{
 		fh->currentBlock = fs->table[fh->currentBlock];
 	}
+
+	return 0;
+}
+
+int getAttributes(FileSystem *fs, FileHandle *fh, attributes *attr)
+{
+	DirectoryEntry *file = &fs->entries[fh->fileIndex];
+
+	attr->creationTimestamp = file->creationTimestamp;
+	attr->lastAccessTimestamp = file->lastAccessTimestamp;
+	attr->size = file->size;
 
 	return 0;
 }
