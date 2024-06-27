@@ -7,17 +7,14 @@ enum
 	SEEK_CURRENT,
 	SEEK_ENDING
 };
-typedef enum
-{
-	FILE_TYPE,
-	DIRECTORY_TYPE
-} EntryType;
 
 typedef struct FileSystem FileSystem;
 typedef struct DirectoryEntry DirectoryEntry;
 typedef struct FileHandle FileHandle;
 
 FileSystem *initializeFileSystem();
+size_t getTotalSize(FileSystem* fs);
+size_t getOccupiedSize(FileSystem* fs);
 int createFile(FileSystem *fs, char *fileName);
 int eraseFile(FileSystem *fs, char *fileName);
 FileHandle * open(FileSystem *fs, char *fileName);

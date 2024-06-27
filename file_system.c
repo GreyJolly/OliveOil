@@ -6,7 +6,15 @@
 #include "file_system.h"
 
 #define FREE_BLOCK -1
+
 #define END_OF_CHAIN -2
+
+typedef enum
+{
+	FREE_TYPE,
+	FILE_TYPE,
+	DIRECTORY_TYPE
+} EntryType;
 
 struct DirectoryEntry
 {
@@ -21,13 +29,13 @@ struct DirectoryEntry
 
 struct FileSystem
 {
-	int *table;					// FAT table
-	DirectoryEntry *entries;	// Directory entries
-	char (*data)[BLOCK_SIZE];	// Data blocks as a 2D array
-	int entryCount;				// How many entries currently present
-	int maxEntries;				// How many entries at most
-	int totalBlocks;			// How many blocks at most
-	int currentDirIndex;		// Index of the current directory
+	int *table;				  // FAT table
+	DirectoryEntry *entries;  // Directory entries
+	char (*data)[BLOCK_SIZE]; // Data blocks as a 2D array
+	int entryCount;			  // How many entries currently present
+	int maxEntries;			  // How many entries at most
+	int totalBlocks;		  // How many blocks at most
+	int currentDirIndex;	  // Index of the current directory
 };
 
 struct FileHandle
@@ -45,7 +53,7 @@ FileSystem *initializeFileSystem(void *memory, size_t size)
 		errno = ENOMEM;
 		return NULL;
 	}
-	
+
 	FileSystem *fs = (FileSystem *)memory;
 
 	fs->totalBlocks = (size - sizeof(FileSystem)) / (BLOCK_SIZE + sizeof(int));
@@ -73,6 +81,24 @@ FileSystem *initializeFileSystem(void *memory, size_t size)
 	fs->currentDirIndex = 0; // Set current directory to root
 
 	return fs;
+}
+
+size_t getTotalSize(FileSystem *fs)
+{
+	return fs->totalBlocks * BLOCK_SIZE;
+}
+
+size_t getOccupiedSize(FileSystem *fs)
+{
+	size_t occupiedSize = 0;
+	for (int i = 0; i < fs->totalBlocks; ++i)
+	{
+		if (fs->table[i] != FREE_BLOCK)
+		{
+			occupiedSize += BLOCK_SIZE;
+		}
+	}
+	return occupiedSize;
 }
 
 int createFile(FileSystem *fs, char *fileName)
@@ -109,18 +135,24 @@ int createFile(FileSystem *fs, char *fileName)
 int eraseFile(FileSystem *fs, char *fileName)
 {
 	// Find the file to erase in the current directory
-	for (int i = 0; i < fs->entryCount; i++)
+	int j = 0;
+	for (int i = 0; j < fs->entryCount; i++)
 	{
+		if (fs->entries[i].type == FREE_TYPE)
+			continue;
+
 		if (fs->entries[i].parentIndex == fs->currentDirIndex &&
 			strcmp(fs->entries[i].name, fileName) == 0 &&
 			fs->entries[i].type == FILE_TYPE)
 		{
 
 			// Erase the file
-			fs->entries[i].type = FREE_BLOCK; // Mark as unused
+			fs->entries[i].type = FREE_TYPE; // Mark as unused
 			fs->entryCount--;
+
 			return 0; // File erased successfully
 		}
+		eraseFile;
 	}
 
 	errno = ENOENT;
@@ -138,8 +170,12 @@ FileHandle *open(FileSystem *fs, char *fileName)
 	fh->fileIndex = -1; // Initialize to invalid index
 
 	// Find the file in the current directory
-	for (int i = 0; i < fs->entryCount; i++)
+	int j = 0;
+	for (int i = 0; j < fs->entryCount; i++)
 	{
+		if (fs->entries[i].type == FREE_TYPE)
+			continue;
+
 		if (fs->entries[i].parentIndex == fs->currentDirIndex &&
 			strcmp(fs->entries[i].name, fileName) == 0 &&
 			fs->entries[i].type == FILE_TYPE)
@@ -153,6 +189,7 @@ FileHandle *open(FileSystem *fs, char *fileName)
 			fs->entries[i].lastAccessTimestamp = fs->entries[i].creationTimestamp;
 			return fh; // Return the FileHandle pointer
 		}
+		j++;
 	}
 
 	free(fh); // Clean up on failure
@@ -349,12 +386,30 @@ int createDir(FileSystem *fs, char *dirName)
 int eraseDir(FileSystem *fs, char *dirName)
 {
 	// Find the directory to erase in the current directory
-	for (int i = 0; i < fs->entryCount; i++)
+	int j = 0;
+	for (int i = 0; j < fs->entryCount; i++)
 	{
+		if (fs->entries[i].type == FREE_TYPE)
+			continue;
+
 		if (fs->entries[i].parentIndex == fs->currentDirIndex &&
 			strcmp(fs->entries[i].name, dirName) == 0 &&
 			fs->entries[i].type == DIRECTORY_TYPE)
 		{
+
+			int w = 0;
+			for (int k = 0; w < fs->entryCount; k++)
+			{
+				if (fs->entries[k].type == FREE_TYPE)
+					continue;
+
+				if (fs->entries[k].parentIndex == i)
+				{
+					errno = ENOTEMPTY;
+					return -1; // Directory not empty
+				}
+				w++;
+			}
 
 			// Erase the directory and its contents
 			int dirIndex = i;
@@ -375,10 +430,11 @@ int eraseDir(FileSystem *fs, char *dirName)
 			}
 
 			// Remove the directory entry itself
-			fs->entries[dirIndex].type = FREE_BLOCK; // Mark as unused
+			fs->entries[dirIndex].type = FREE_TYPE; // Mark as unused
 			fs->entryCount--;
 			return 0; // Directory erased successfully
 		}
+		j++;
 	}
 
 	errno = ENOENT;
@@ -391,6 +447,16 @@ int changeDir(FileSystem *fs, char *dirName)
 	if (strcmp(dirName, "/") == 0)
 	{
 		fs->currentDirIndex = 0;
+		return 0;
+	}
+	if (strcmp(dirName, "..") == 0)
+	{
+		if (fs->currentDirIndex == 0)
+		{
+			// Already at root
+			return 0;
+		}
+		fs->currentDirIndex = fs->entries[fs->currentDirIndex].parentIndex;
 		return 0;
 	}
 
@@ -414,8 +480,12 @@ int changeDir(FileSystem *fs, char *dirName)
 void listDir(FileSystem *fs)
 {
 	fs->entries[fs->currentDirIndex].lastAccessTimestamp = time(NULL);
-	for (int i = 0; i < fs->entryCount; i++)
+	int j = 0;
+	for (int i = 0; j < fs->entryCount; i++)
 	{
+		if (fs->entries[i].type == FREE_TYPE)
+			continue;
+
 		if (fs->entries[i].parentIndex == fs->currentDirIndex)
 		{
 			if (fs->entries[i].type == DIRECTORY_TYPE)
@@ -427,5 +497,6 @@ void listDir(FileSystem *fs)
 				printf("FILE %s\n", fs->entries[i].name);
 			}
 		}
+		j++;
 	}
 }
