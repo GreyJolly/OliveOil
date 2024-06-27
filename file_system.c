@@ -27,7 +27,7 @@ struct FileSystem
 
 struct FileHandle
 {
-	DirectoryEntry *file;
+	int fileIndex; // Index of the file in the entries array
 	int currentBlock;
 	int currentPosition;
 };
@@ -72,12 +72,12 @@ FileSystem *initializeFileSystem(void *memory, size_t size)
 	return fs;
 }
 
-DirectoryEntry *createFile(FileSystem *fs, char *fileName)
+int createFile(FileSystem *fs, char *fileName)
 {
 	if (fs->entryCount >= MAX_ENTRIES)
 	{
 		errno = ENOSPC;
-		return NULL;
+		return -1;
 	}
 
 	// Check if file already exists in the current directory
@@ -88,7 +88,7 @@ DirectoryEntry *createFile(FileSystem *fs, char *fileName)
 			fs->entries[i].type == FILE_TYPE)
 		{
 			errno = EEXIST;
-			return NULL; // File already exists
+			return -1; // File already exists
 		}
 	}
 
@@ -99,7 +99,7 @@ DirectoryEntry *createFile(FileSystem *fs, char *fileName)
 	file->size = 0;
 	file->parentIndex = fs->currentDirIndex;
 
-	return file;
+	return 0;
 }
 
 int eraseFile(FileSystem *fs, char *fileName)
@@ -125,7 +125,15 @@ int eraseFile(FileSystem *fs, char *fileName)
 
 FileHandle *open(FileSystem *fs, char *fileName)
 {
-	// Search for the file in the current directory
+	FileHandle *fh = malloc(sizeof(FileHandle));
+	if (fh == NULL)
+	{
+		return NULL; // Failed to allocate memory
+	}
+
+	fh->fileIndex = -1; // Initialize to invalid index
+
+	// Find the file in the current directory
 	for (int i = 0; i < fs->entryCount; i++)
 	{
 		if (fs->entries[i].parentIndex == fs->currentDirIndex &&
@@ -133,13 +141,15 @@ FileHandle *open(FileSystem *fs, char *fileName)
 			fs->entries[i].type == FILE_TYPE)
 		{
 
-			FileHandle *fh = (FileHandle *)malloc(sizeof(FileHandle));
-			fh->file = &(fs->entries[i]);
-			fh->currentBlock = fh->file->startBlock;
+			// Found the file, store its index in the FileHandle
+			fh->fileIndex = i;
+			fh->currentBlock = fs->entries[i].startBlock;
 			fh->currentPosition = 0;
-			return fh;
+			return fh; // Return the FileHandle pointer
 		}
 	}
+
+	free(fh); // Clean up on failure
 	errno = ENOENT;
 	return NULL; // File not found
 }
@@ -152,6 +162,7 @@ void close(FileHandle *fh)
 int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 {
 	int bytesWritten = 0;
+	DirectoryEntry *file = &fs->entries[fh->fileIndex];
 
 	while (bytesWritten < dataLength)
 	{
@@ -165,13 +176,13 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 				{
 					freeBlock = i;
 					fs->table[i] = END_OF_CHAIN;
-					if (fh->file->startBlock == FREE_BLOCK)
+					if (file->startBlock == FREE_BLOCK)
 					{
-						fh->file->startBlock = i;
+						file->startBlock = i;
 					}
 					else
 					{
-						int lastBlock = fh->file->startBlock;
+						int lastBlock = file->startBlock;
 						while (fs->table[lastBlock] != -END_OF_CHAIN)
 						{
 							lastBlock = fs->table[lastBlock];
@@ -214,7 +225,7 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 		}
 	}
 
-	fh->file->size += bytesWritten;
+	file->size += bytesWritten;
 	return bytesWritten;
 }
 
@@ -251,7 +262,7 @@ char *read(FileSystem *fs, FileHandle *fh, int dataLength)
 int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 {
 	int newPos;
-	DirectoryEntry *file = fh->file;
+	DirectoryEntry *file = &fs->entries[fh->fileIndex];
 
 	if (file->type != FILE_TYPE)
 	{
@@ -268,7 +279,7 @@ int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 		newPos = fh->currentPosition + offset;
 		break;
 	case SEEK_ENDING:
-		newPos = file->size + offset;
+		newPos = file->size - offset;
 		break;
 	default:
 		errno = EINVAL;

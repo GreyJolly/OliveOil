@@ -20,9 +20,9 @@ typedef struct DirectoryEntry DirectoryEntry;
 typedef struct FileHandle FileHandle;
 
 FileSystem *initializeFileSystem();
-DirectoryEntry *createFile(FileSystem *fs, char *fileName);
+int createFile(FileSystem *fs, char *fileName);
 int eraseFile(FileSystem *fs, char *fileName);
-FileHandle *open(FileSystem *fs, char *fileName);
+FileHandle * open(FileSystem *fs, char *fileName);
 void close(FileHandle *fh);
 int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength);
 char *read(FileSystem *fs, FileHandle *fh, int dataLength);
