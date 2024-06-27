@@ -10,7 +10,13 @@ int main()
 	// Start timing tests
 	clock_t beginningTime = clock();
 
-	FileSystem *fs = initializeFileSystem();
+    // Allocate a large enough memory block
+    size_t totalSize = sizeof(FileSystem) + MAX_BLOCKS * sizeof(int) + MAX_ENTRIES * sizeof(DirectoryEntry) + MAX_BLOCKS * BLOCK_SIZE;
+    void *memory = malloc(totalSize);
+
+    // Initialize the filesystem with the provided memory block
+    FileSystem *fs = initializeFileSystem(memory, totalSize);
+
     
     createDir(fs, "dir1");
     createDir(fs, "dir2");
@@ -21,7 +27,10 @@ int main()
 	write(fs, fh, "Contents of file1.txt", strlen("Contents of file1.txt"));
 	seek(fs, fh, 0, SEEK_BEGIN);
 
-	printf("Contents of first file:\n%s\n", read(fs, fh, strlen("Contents of file1.txt")));
+	char * string = read(fs, fh, strlen("Contents of file1.txt"));
+	printf("Contents of first file:\n%s\n", string);
+	free(string);
+	close(fh);
 
     printf("Root directory listing:\n");
     listDir(fs);
@@ -32,13 +41,13 @@ int main()
     listDir(fs);
     
     changeDir(fs, "/");
-    eraseFile(fs, &(fs->entries[2])); 	// Erase file1.txt
-    eraseDir(fs, &(fs->entries[1])); 	// Erase dir2
+    eraseFile(fs, "file1.txt"); 	// Erase file1.txt
+    eraseDir(fs, "dir2"); 	// Erase dir2
     printf("\nRoot directory listing after deletions:\n");
     listDir(fs);
     
-    free(fs->table);
-    free(fs);
+
+	free(memory);
 	// End timing tests
 	clock_t endingTime = clock();
 	printf("Ended testing.");

@@ -15,9 +15,9 @@ typedef struct {
 } DirectoryEntry;
 
 typedef struct {
-    int *table;  // File Allocation Table
-    DirectoryEntry entries[MAX_ENTRIES];
-    char data[MAX_BLOCKS][BLOCK_SIZE];  // Data blocks
+    int *table;  // FAT table
+    DirectoryEntry *entries;  // Directory entries
+    char (*data)[BLOCK_SIZE];  // Data blocks as a 2D array
     int entryCount;
     int currentDirIndex;  // Index of the current directory
 } FileSystem;
@@ -30,13 +30,13 @@ typedef struct {
 
 FileSystem * initializeFileSystem();
 DirectoryEntry *createFile(FileSystem *fs, char *fileName);
-int eraseFile(FileSystem *fs, DirectoryEntry *file);
+int eraseFile(FileSystem *fs, char *fileName);
 FileHandle * open(FileSystem *fs, char *fileName);
 void close(FileHandle *fh);
 int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength);
 char *read(FileSystem *fs, FileHandle *fh, int dataLength);
 int seek(FileSystem *fs, FileHandle *fh, int offset, int whence);
-DirectoryEntry *createDir(FileSystem *fs, char *dirName);
-int eraseDir(FileSystem *fs, DirectoryEntry *dir);
+int createDir(FileSystem *fs, char *dirName);
+int eraseDir(FileSystem *fs, char *dirName);
 int changeDir(FileSystem *fs, char *dirName);
 void listDir(FileSystem *fs);
