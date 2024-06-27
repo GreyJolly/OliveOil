@@ -50,15 +50,15 @@ int isValidFilename(const char *filename)
 {
 	int length = strlen(filename);
 	if (length == 0 || length > MAX_FILENAME_LENGTH)
-	{
 		return 0;
-	}
+
+	if (strcmp(filename, "..") == 0)
+		return 0; // Files can't be called "..""
+
 	for (int i = 0; i < length; ++i)
 	{
 		if (!isalnum(filename[i]) && filename[i] != '.' && filename[i] != '_' && filename[i] != '-')
-		{
 			return 0;
-		}
 	}
 	return 1;
 }

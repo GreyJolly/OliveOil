@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/mman.h>
+
 #include "file_system.h"
 
-#define FILESYSTEM_SIZE 1000000000
+#define FILESYSTEM_SIZE 1.5*1024*1024*1024 // 1.5 GB
 
 #define TEST_PASS 1
 #define TEST_FAIL 0
@@ -59,8 +61,12 @@ void testFileSystem()
 {
 
 	// Allocate a large enough memory block
-	void *memory = malloc(FILESYSTEM_SIZE);
-
+	void *memory = mmap(NULL, FILESYSTEM_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if (memory == MAP_FAILED)
+	{
+		perror("mmap failed");
+		return;
+	}
 	// Initialize the filesystem with the provided memory block
 	FileSystem *fs = initializeFileSystem(memory, FILESYSTEM_SIZE);
 
@@ -157,7 +163,11 @@ void testFileSystem()
 	printf("Total tests ran:\t%d\n", testsRun);
 	printf("Total tests passed:\t%d\n", testsPassed);
 
-	free(memory);
+	if (munmap(memory, FILESYSTEM_SIZE) == -1)
+	{
+		perror("munmap failed");
+		return;
+	}
 }
 
 int main()
