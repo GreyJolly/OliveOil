@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
+#include <ctype.h>
 #include "file_system.h"
 
 #define FREE_BLOCK -1
@@ -20,22 +21,22 @@ struct DirectoryEntry
 {
 	char name[MAX_FILENAME_LENGTH];
 	EntryType type;
-	int startBlock;				// Starting block of file
+	int startBlock; // Starting block of file
 	int size;
-	int parentIndex;			// Index of the parent directory
+	int parentIndex; // Index of the parent directory
 	time_t creationTimestamp;
 	time_t lastAccessTimestamp;
 };
 
 struct FileSystem
 {
-	int *table;					// FAT table
-	DirectoryEntry *entries;	// Directory entries
-	char (*data)[BLOCK_SIZE];	// Data blocks as a 2D array
-	int entryCount;				// How many entries currently present
-	int maxEntries;				// How many entries at most
-	int totalBlocks;			// How many blocks at most
-	int currentDirIndex;		// Index of the current directory
+	int *table;				  // FAT table
+	DirectoryEntry *entries;  // Directory entries
+	char (*data)[BLOCK_SIZE]; // Data blocks as a 2D array
+	int entryCount;			  // How many entries currently present
+	int maxEntries;			  // How many entries at most
+	int totalBlocks;		  // How many blocks at most
+	int currentDirIndex;	  // Index of the current directory
 };
 
 struct FileHandle
@@ -44,6 +45,23 @@ struct FileHandle
 	int currentBlock;
 	int currentPosition;
 };
+
+int isValidFilename(const char *filename)
+{
+	int length = strlen(filename);
+	if (length == 0 || length > MAX_FILENAME_LENGTH)
+	{
+		return 0;
+	}
+	for (int i = 0; i < length; ++i)
+	{
+		if (!isalnum(filename[i]) && filename[i] != '.' && filename[i] != '_' && filename[i] != '-')
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
 
 FileSystem *initializeFileSystem(void *memory, size_t size)
 {
@@ -103,6 +121,11 @@ size_t getOccupiedSize(FileSystem *fs)
 
 int createFile(FileSystem *fs, char *fileName)
 {
+	if (!isValidFilename(fileName))
+	{
+		errno = EINVAL;
+		return -1;
+	}
 	if (fs->entryCount >= fs->maxEntries)
 	{
 		errno = ENOSPC;
@@ -364,6 +387,11 @@ int getAttributes(FileSystem *fs, FileHandle *fh, attributes *attr)
 
 int createDir(FileSystem *fs, char *dirName)
 {
+	if (!isValidFilename(dirName))
+	{
+		errno = EINVAL;
+		return -1;
+	}
 	if (fs->entryCount >= fs->maxEntries)
 	{
 		errno = ENOSPC;

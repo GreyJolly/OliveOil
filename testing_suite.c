@@ -81,10 +81,16 @@ void testFileSystem()
 	assertTest(createDir(fs, "dir3") == 0, "Create directory 'dir3' inside 'dir1'");
 	assertTest(changeDir(fs, "dir3") == 0, "Change to directory 'dir3' inside 'dir1'");
 	assertTest(createDir(fs, "dir4") == 0, "Create directory 'dir4' inside 'dir3'");
+	assertTest(changeDir(fs, "dir4") == 0, "Change to directory 'dir4' inside 'dir3'");
+	assertTest(changeDir(fs, "..") == 0, "Go back to parent directory 'dir3'");
 
 	// Create some files
-	assertTest(createFile(fs, "file3.txt") == 0, "Create file 'file3.txt' in dir4");
-	assertTest(createFile(fs, "file4.txt") == 0, "Create file 'file4.txt' in dir4");
+	assertTest(createFile(fs, "file3.txt") == 0, "Create file 'file3.txt' in dir3");
+	assertTest(createFile(fs, "file4.txt") == 0, "Create file 'file4.txt' in dir3");
+
+	// List current directory
+	printf("Listing dir3:\n");
+	listDir(fs);
 
 	assertTest(changeDir(fs, "/") == 0, "Change to root");
 
@@ -105,7 +111,7 @@ void testFileSystem()
 
 		assertTest(getAttributes(fs, fh1, &attr) == 0, "Get attributes of 'file1.txt'");
 		printf("Size of 'file1.txt': %s\n", formatSize(attr.size));
-		
+
 		close(fh1);
 	}
 
@@ -157,11 +163,8 @@ void testFileSystem()
 int main()
 {
 	printf("Starting testing...\n");
-	// Start timing tests
 	clock_t beginningTime = clock();
 	testFileSystem();
-
-	// End timing tests
 	clock_t endingTime = clock();
 	printf("Ended testing.");
 	printf("\nTime:\t%.3lfms\n", (double)(endingTime - beginningTime) / CLOCKS_PER_SEC * 1000);
