@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <time.h>
 #include "file_system.h"
 
 #define FREE_BLOCK -1
@@ -14,15 +15,19 @@ struct DirectoryEntry
 	int startBlock;
 	int size;
 	int parentIndex; // Index of the parent directory
+	time_t creationTimestamp;
+	time_t lastAccessTimestamp;
 };
 
 struct FileSystem
 {
-	int *table;				  // FAT table
-	DirectoryEntry *entries;  // Directory entries
-	char (*data)[BLOCK_SIZE]; // Data blocks as a 2D array
-	int entryCount;
-	int currentDirIndex; // Index of the current directory
+	int *table;					// FAT table
+	DirectoryEntry *entries;	// Directory entries
+	char (*data)[BLOCK_SIZE];	// Data blocks as a 2D array
+	int entryCount;				// How many entries currently present
+	int maxEntries;				// How many entries at most
+	int totalBlocks;			// How many blocks at most
+	int currentDirIndex;		// Index of the current directory
 };
 
 struct FileHandle
@@ -34,26 +39,24 @@ struct FileHandle
 
 FileSystem *initializeFileSystem(void *memory, size_t size)
 {
-	// Calculate the required sizes for different components
-	size_t fatSize = MAX_BLOCKS * sizeof(int);
-	size_t entriesSize = MAX_ENTRIES * sizeof(DirectoryEntry);
-	size_t dataSize = MAX_BLOCKS * BLOCK_SIZE;
-
-	// Ensure the provided memory is large enough
-	if (size < fatSize + entriesSize + dataSize)
+	if (size < sizeof(FileSystem) + BLOCK_SIZE)
 	{
+		printf("Size: %ld, needed: %ld", size, sizeof(FileSystem) + BLOCK_SIZE);
 		errno = ENOMEM;
 		return NULL;
 	}
-
+	
 	FileSystem *fs = (FileSystem *)memory;
+
+	fs->totalBlocks = (size - sizeof(FileSystem)) / (BLOCK_SIZE + sizeof(int));
+	fs->maxEntries = fs->totalBlocks; // Assuming one directory entry per block for simplicity
 
 	// Allocate the FAT table, directory entries, and data blocks within the provided memory
 	fs->table = (int *)((char *)memory + sizeof(FileSystem));
-	fs->entries = (DirectoryEntry *)((char *)fs->table + fatSize);
-	fs->data = (char(*)[BLOCK_SIZE])((char *)fs->entries + entriesSize);
+	fs->entries = (DirectoryEntry *)((char *)fs->table + sizeof(int) * fs->maxEntries);
+	fs->data = (char(*)[BLOCK_SIZE])((char *)fs->entries + sizeof(fs->entries));
 
-	for (int i = 0; i < MAX_BLOCKS; i++)
+	for (int i = 0; i < fs->totalBlocks; i++)
 	{
 		fs->table[i] = FREE_BLOCK;
 	}
@@ -74,7 +77,7 @@ FileSystem *initializeFileSystem(void *memory, size_t size)
 
 int createFile(FileSystem *fs, char *fileName)
 {
-	if (fs->entryCount >= MAX_ENTRIES)
+	if (fs->entryCount >= fs->maxEntries)
 	{
 		errno = ENOSPC;
 		return -1;
@@ -94,6 +97,7 @@ int createFile(FileSystem *fs, char *fileName)
 
 	DirectoryEntry *file = &(fs->entries[fs->entryCount++]);
 	strncpy(file->name, fileName, MAX_FILENAME_LENGTH);
+
 	file->type = FILE_TYPE;
 	file->startBlock = FREE_BLOCK; // No blocks allocated yet
 	file->size = 0;
@@ -145,6 +149,8 @@ FileHandle *open(FileSystem *fs, char *fileName)
 			fh->fileIndex = i;
 			fh->currentBlock = fs->entries[i].startBlock;
 			fh->currentPosition = 0;
+			fs->entries[i].creationTimestamp = time(NULL);
+			fs->entries[i].lastAccessTimestamp = fs->entries[i].creationTimestamp;
 			return fh; // Return the FileHandle pointer
 		}
 	}
@@ -163,6 +169,7 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 {
 	int bytesWritten = 0;
 	DirectoryEntry *file = &fs->entries[fh->fileIndex];
+	file->lastAccessTimestamp = time(NULL);
 
 	while (bytesWritten < dataLength)
 	{
@@ -170,7 +177,7 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 		{
 			// Allocate a new block if needed
 			int freeBlock = -1;
-			for (int i = 0; i < MAX_BLOCKS; i++)
+			for (int i = 0; i < fs->totalBlocks; i++)
 			{
 				if (fs->table[i] == FREE_BLOCK)
 				{
@@ -234,6 +241,8 @@ char *read(FileSystem *fs, FileHandle *fh, int dataLength)
 	char *buffer = (char *)malloc(dataLength + 1);
 	int bytesRead = 0;
 
+	fs->entries[fh->fileIndex].lastAccessTimestamp = time(NULL);
+
 	while (bytesRead < dataLength && fh->currentBlock != FREE_BLOCK)
 	{
 		int blockOffset = fh->currentPosition % BLOCK_SIZE;
@@ -263,6 +272,7 @@ int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 {
 	int newPos;
 	DirectoryEntry *file = &fs->entries[fh->fileIndex];
+	file->lastAccessTimestamp = time(NULL);
 
 	if (file->type != FILE_TYPE)
 	{
@@ -306,7 +316,7 @@ int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 
 int createDir(FileSystem *fs, char *dirName)
 {
-	if (fs->entryCount >= MAX_ENTRIES)
+	if (fs->entryCount >= fs->maxEntries)
 	{
 		errno = ENOSPC;
 		return -1; // Too many directories
@@ -330,6 +340,8 @@ int createDir(FileSystem *fs, char *dirName)
 	dir->startBlock = FREE_BLOCK; // No blocks allocated yet
 	dir->size = 0;
 	dir->parentIndex = fs->currentDirIndex;
+	dir->creationTimestamp = time(NULL);
+	dir->lastAccessTimestamp = dir->creationTimestamp;
 
 	return 0;
 }
@@ -390,6 +402,7 @@ int changeDir(FileSystem *fs, char *dirName)
 			fs->entries[i].type == DIRECTORY_TYPE)
 		{
 			fs->currentDirIndex = i;
+			fs->entries[i].lastAccessTimestamp = time(NULL);
 			return 0;
 		}
 	}
@@ -400,6 +413,7 @@ int changeDir(FileSystem *fs, char *dirName)
 
 void listDir(FileSystem *fs)
 {
+	fs->entries[fs->currentDirIndex].lastAccessTimestamp = time(NULL);
 	for (int i = 0; i < fs->entryCount; i++)
 	{
 		if (fs->entries[i].parentIndex == fs->currentDirIndex)

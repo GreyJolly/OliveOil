@@ -1,5 +1,3 @@
-#define MAX_BLOCKS 1024
-#define MAX_ENTRIES 128
 #define BLOCK_SIZE 512
 #define MAX_FILENAME_LENGTH 64
 

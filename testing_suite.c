@@ -4,7 +4,7 @@
 #include <time.h>
 #include "file_system.h"
 
-#define MAXIMUM_SIZE 538656 // At one time, this was calculated to be the maximum size
+#define FILESYSTEM_SIZE 1000000000
 
 int main()
 {
@@ -14,12 +14,14 @@ int main()
 
     // Allocate a large enough memory block
 
-    void *memory = malloc(MAXIMUM_SIZE);
+    void *memory = malloc(FILESYSTEM_SIZE);
 
     // Initialize the filesystem with the provided memory block
-    FileSystem *fs = initializeFileSystem(memory, MAXIMUM_SIZE);
-
-    
+    FileSystem *fs = initializeFileSystem(memory, FILESYSTEM_SIZE);
+	if (fs == NULL) {
+		perror("Create");
+		exit(EXIT_FAILURE);
+	}
     createDir(fs, "dir1");
     createDir(fs, "dir2");
     createFile(fs, "file1.txt");
