@@ -6,7 +6,7 @@
 
 #include "file_system.h"
 
-#define FILESYSTEM_SIZE 1.5*1024*1024*1024 // 1.5 GB
+#define FILESYSTEM_SIZE 1.5 * 1024 * 1024 * 1024 // 1.5 GB
 
 #define TEST_PASS 1
 #define TEST_FAIL 0
@@ -126,6 +126,24 @@ void testFileSystem()
 	if (fh2)
 	{
 		assertTest(write(fs, fh2, "Another test.", 13) == 13, "Write to 'file2.txt'");
+
+		close(fh2);
+	}
+
+	// Test overwriting files
+	fh1 = open(fs, "file1.txt");
+	if (fh1)
+	{
+		assertTest(write(fs, fh2, "The contents of this files have been entirely overwritten.", 58) == 58, "Overwrite to 'file1.txt'");
+		close(fh1);
+	}
+
+	fh2 = open(fs, "file2.txt");
+	if (fh2)
+	{
+		assertTest(seek(fs, fh1, 1, SEEK_END) == 0, "Seek to end of 'file2.txt'");
+		assertTest(write(fs, fh2, ", this text has been added later.", 33) == 33, "Overwrite to 'file2.txt'");
+
 		close(fh2);
 	}
 
@@ -135,8 +153,8 @@ void testFileSystem()
 	fh1 = open(fs, "file1.txt");
 	if (fh1)
 	{
-		char *data = read(fs, fh1, 13);
-		assertTest(data != NULL && strcmp(data, "Hello, World!") == 0, "Read from 'file1.txt'");
+		char *data = read(fs, fh1, 58);
+		assertTest(data != NULL && strcmp(data, "The contents of this files have been entirely overwritten.") == 0, "Read from 'file1.txt'");
 		free(data);
 		close(fh1);
 	}
@@ -144,8 +162,8 @@ void testFileSystem()
 	fh2 = open(fs, "file2.txt");
 	if (fh2)
 	{
-		char *data = read(fs, fh2, 13);
-		assertTest(data != NULL && strcmp(data, "Another test.") == 0, "Read from 'file2.txt'");
+		char *data = read(fs, fh2, strlen("Another test, this text has been added later."));
+		assertTest(data != NULL && strcmp(data, "Another test, this text has been added later.") == 0, "Read from 'file2.txt'");
 		free(data);
 		close(fh2);
 	}

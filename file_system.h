@@ -1,5 +1,6 @@
 #define BLOCK_SIZE 512
 #define MAX_FILENAME_LENGTH 64
+#define  PERCENTAGE_OF_ENTRIES 5 // What percentage of the size of the memory is dedicated to entries (instead of the blocks, FAT or else)
 
 enum
 {

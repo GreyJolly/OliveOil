@@ -65,22 +65,22 @@ int isValidFilename(const char *filename)
 
 FileSystem *initializeFileSystem(void *memory, size_t size)
 {
-	if (size < sizeof(FileSystem) + BLOCK_SIZE)
+	if (size < sizeof(FileSystem) + sizeof(DirectoryEntry) + BLOCK_SIZE + sizeof(int))
 	{
-		printf("Size: %ld, needed: %ld", size, sizeof(FileSystem) + BLOCK_SIZE);
+		// Not enough space to allocate a fileSystem
 		errno = ENOMEM;
 		return NULL;
 	}
 
 	FileSystem *fs = (FileSystem *)memory;
 
-	fs->totalBlocks = (size - sizeof(FileSystem)) / (BLOCK_SIZE + sizeof(int));
-	fs->maxEntries = fs->totalBlocks; // Assuming one directory entry per block for simplicity
+	fs->maxEntries = ((size - sizeof(FileSystem)) * PERCENTAGE_OF_ENTRIES / 100) / sizeof(DirectoryEntry);
+	fs->totalBlocks = (size - sizeof(FileSystem) - fs->maxEntries * sizeof(DirectoryEntry)) / (BLOCK_SIZE + sizeof(int));
 
 	// Allocate the FAT table, directory entries, and data blocks within the provided memory
 	fs->table = (int *)((char *)memory + sizeof(FileSystem));
-	fs->entries = (DirectoryEntry *)((char *)fs->table + sizeof(int) * fs->maxEntries);
-	fs->data = (char(*)[BLOCK_SIZE])((char *)fs->entries + sizeof(fs->entries));
+	fs->entries = (DirectoryEntry *)((char *)fs->table + fs->totalBlocks * sizeof(int));
+	fs->data = (char(*)[BLOCK_SIZE])((char *)fs->entries + fs->maxEntries * sizeof(DirectoryEntry));
 
 	for (int i = 0; i < fs->totalBlocks; i++)
 	{
@@ -145,7 +145,8 @@ int createFile(FileSystem *fs, char *fileName)
 	}
 
 	DirectoryEntry *file = &(fs->entries[fs->entryCount++]);
-	strncpy(file->name, fileName, MAX_FILENAME_LENGTH);
+	strncpy(file->name, fileName, MAX_FILENAME_LENGTH - 1);
+	file->name[MAX_FILENAME_LENGTH - 1] = '\0';
 
 	file->type = FILE_TYPE;
 	file->startBlock = FREE_BLOCK; // No blocks allocated yet
@@ -159,7 +160,7 @@ int eraseFile(FileSystem *fs, char *fileName)
 {
 	// Find the file to erase in the current directory
 	int j = 0;
-	for (int i = 0; j < fs->entryCount; i++)
+	for (int i = 0; j < fs->entryCount && i < fs->maxEntries; i++)
 	{
 		if (fs->entries[i].type == FREE_TYPE)
 			continue;
@@ -194,7 +195,7 @@ FileHandle *open(FileSystem *fs, char *fileName)
 
 	// Find the file in the current directory
 	int j = 0;
-	for (int i = 0; j < fs->entryCount; i++)
+	for (int i = 0; j < fs->entryCount && i < fs->maxEntries; i++)
 	{
 		if (fs->entries[i].type == FREE_TYPE)
 			continue;
@@ -250,7 +251,7 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 					else
 					{
 						int lastBlock = file->startBlock;
-						while (fs->table[lastBlock] != -END_OF_CHAIN)
+						while (fs->table[lastBlock] != END_OF_CHAIN)
 						{
 							lastBlock = fs->table[lastBlock];
 						}
@@ -411,7 +412,8 @@ int createDir(FileSystem *fs, char *dirName)
 	}
 
 	DirectoryEntry *dir = &(fs->entries[fs->entryCount++]);
-	strncpy(dir->name, dirName, MAX_FILENAME_LENGTH);
+	strncpy(dir->name, dirName, MAX_FILENAME_LENGTH - 1);
+	dir->name[MAX_FILENAME_LENGTH - 1] = '\0';
 	dir->type = DIRECTORY_TYPE;
 	dir->startBlock = FREE_BLOCK; // No blocks allocated yet
 	dir->size = 0;
@@ -426,7 +428,7 @@ int eraseDir(FileSystem *fs, char *dirName)
 {
 	// Find the directory to erase in the current directory
 	int j = 0;
-	for (int i = 0; j < fs->entryCount; i++)
+	for (int i = 0; j < fs->entryCount && i < fs->maxEntries; i++)
 	{
 		if (fs->entries[i].type == FREE_TYPE)
 			continue;
@@ -520,7 +522,7 @@ void listDir(FileSystem *fs)
 {
 	fs->entries[fs->currentDirIndex].lastAccessTimestamp = time(NULL);
 	int j = 0;
-	for (int i = 0; j < fs->entryCount; i++)
+	for (int i = 0; j < fs->entryCount && i < fs->maxEntries; i++)
 	{
 		if (fs->entries[i].type == FREE_TYPE)
 			continue;
