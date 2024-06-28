@@ -74,7 +74,10 @@ FileSystem *initializeFileSystem(void *memory, size_t size)
 
 	FileSystem *fs = (FileSystem *)memory;
 
+	// Calculate how many entries and blocks we can handle
 	fs->maxEntries = ((size - sizeof(FileSystem)) * PERCENTAGE_OF_ENTRIES / 100) / sizeof(DirectoryEntry);
+	if (fs->maxEntries < 1)
+		fs->maxEntries = 1;
 	fs->totalBlocks = (size - sizeof(FileSystem) - fs->maxEntries * sizeof(DirectoryEntry)) / (BLOCK_SIZE + sizeof(int));
 
 	// Allocate the FAT table, directory entries, and data blocks within the provided memory

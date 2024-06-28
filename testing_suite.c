@@ -115,8 +115,7 @@ void testFileSystem()
 		assertTest(write(fs, fh1, "Hello, World!", 13) == 13, "Write to 'file1.txt'");
 		attributes attr;
 
-		assertTest(getAttributes(fs, fh1, &attr) == 0, "Get attributes of 'file1.txt'");
-		printf("Size of 'file1.txt': %s\n", formatSize(attr.size));
+		assertTest(getAttributes(fs, fh1, &attr) == 0 && attr.size == 13, "Get attributes of 'file1.txt'");
 
 		close(fh1);
 	}
