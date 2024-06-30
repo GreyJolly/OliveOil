@@ -102,6 +102,7 @@ void testFileSystem()
 
 	assertTest(createFile(fs, "file1.txt") == 0, "Create file 'file1.txt' in root");
 	assertTest(createFile(fs, "file2.txt") == 0, "Create file 'file2.txt' in root");
+	assertTest(createFile(fs, "Invalid Filename") == -1, "Create file with invalid filename");
 
 	// List current directory
 	printf("Listing root directory:\n");
@@ -114,9 +115,9 @@ void testFileSystem()
 	{
 		assertTest(write(fs, fh1, "Hello, World!", 13) == 13, "Write to 'file1.txt'");
 		attributes attr;
-
 		assertTest(getAttributes(fs, fh1, &attr) == 0 && attr.size == 13, "Get attributes of 'file1.txt'");
-
+		assertTest(seek(fs, fh1, 10, SEEK_CUR) == -1, "Invalid seek in 'file1.txt'");
+		assertTest(write(fs, fh1, "Hello, World!", 13) == 13, "Write to 'file1.txt'");
 		close(fh1);
 	}
 
@@ -140,7 +141,7 @@ void testFileSystem()
 	fh2 = open(fs, "file2.txt");
 	if (fh2)
 	{
-		assertTest(seek(fs, fh1, 1, SEEK_END) == 0, "Seek to end of 'file2.txt'");
+		assertTest(seek(fs, fh1, -1, SEEK_END) == 0, "Seek to end of 'file2.txt'");
 		assertTest(write(fs, fh2, ", this text has been added later.", 33) == 33, "Overwrite to 'file2.txt'");
 
 		close(fh2);
@@ -152,7 +153,7 @@ void testFileSystem()
 	fh1 = open(fs, "file1.txt");
 	if (fh1)
 	{
-		char *data = read(fs, fh1, 58);
+		char *data = read(fs, fh1, 100);
 		assertTest(data != NULL && strcmp(data, "The contents of this files have been entirely overwritten.") == 0, "Read from 'file1.txt'");
 		free(data);
 		close(fh1);
@@ -161,7 +162,7 @@ void testFileSystem()
 	fh2 = open(fs, "file2.txt");
 	if (fh2)
 	{
-		char *data = read(fs, fh2, strlen("Another test, this text has been added later."));
+		char *data = read(fs, fh2, 100);
 		assertTest(data != NULL && strcmp(data, "Another test, this text has been added later.") == 0, "Read from 'file2.txt'");
 		free(data);
 		close(fh2);

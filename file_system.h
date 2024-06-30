@@ -1,6 +1,6 @@
 #define BLOCK_SIZE 512
 #define MAX_FILENAME_LENGTH 64
-#define  PERCENTAGE_OF_ENTRIES 5 // What percentage of the size of the memory is dedicated to entries (instead of the blocks, FAT or else)
+#define PERCENTAGE_OF_ENTRIES 5 // What percentage of the size of the memory is dedicated to entries (instead of the blocks, FAT or else)
 
 enum
 {
@@ -13,7 +13,8 @@ typedef struct FileSystem FileSystem;
 typedef struct DirectoryEntry DirectoryEntry;
 typedef struct FileHandle FileHandle;
 
-typedef struct {
+typedef struct
+{
 	int size;
 	time_t creationTimestamp;
 	time_t lastAccessTimestamp;
@@ -21,13 +22,13 @@ typedef struct {
 
 // Filesystem functions
 FileSystem *initializeFileSystem();
-size_t getTotalSize(FileSystem* fs);
-size_t getOccupiedSize(FileSystem* fs);
+size_t getTotalSize(FileSystem *fs);
+size_t getOccupiedSize(FileSystem *fs);
 
 // File functions
 int createFile(FileSystem *fs, char *fileName);
 int eraseFile(FileSystem *fs, char *fileName);
-FileHandle * open(FileSystem *fs, char *fileName);
+FileHandle *open(FileSystem *fs, char *fileName);
 void close(FileHandle *fh);
 int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength);
 char *read(FileSystem *fs, FileHandle *fh, int dataLength);

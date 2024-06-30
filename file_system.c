@@ -7,7 +7,6 @@
 #include "file_system.h"
 
 #define FREE_BLOCK -1
-
 #define END_OF_CHAIN -2
 
 typedef enum
@@ -53,7 +52,7 @@ int isValidFilename(const char *filename)
 		return 0;
 
 	if (strcmp(filename, "..") == 0)
-		return 0; // Files can't be called "..""
+		return 0; // Files can't be called ".."
 
 	for (int i = 0; i < length; ++i)
 	{
@@ -300,21 +299,37 @@ int write(FileSystem *fs, FileHandle *fh, char *data, int dataLength)
 	return bytesWritten;
 }
 
-char *read(FileSystem *fs, FileHandle *fh, int dataLength)
+char *read(FileSystem *fs, FileHandle *fh, int maxToBeRead)
 {
-	char *buffer = (char *)malloc(dataLength + 1);
+	char *buffer = (char *)malloc(maxToBeRead + 1);
 	int bytesRead = 0;
 
 	fs->entries[fh->fileIndex].lastAccessTimestamp = time(NULL);
 
-	while (bytesRead < dataLength && fh->currentBlock != FREE_BLOCK)
+	// Calculate the maximum amount of data that can be read
+	int maxReadable = (fs->entries)[fh->fileIndex].size - fh->currentPosition;
+	if (maxReadable <= 0)
+	{
+		// If current position is already at or beyond the file size
+		char *buffer = (char *)malloc(1);
+		buffer[0] = '\0';
+		return buffer;
+	}
+
+	// Adjust dataLength if it exceeds the maximum readable amount
+	if (maxToBeRead > maxReadable)
+	{
+		maxToBeRead = maxReadable;
+	}
+
+	while (bytesRead < maxToBeRead && fh->currentBlock != FREE_BLOCK)
 	{
 		int blockOffset = fh->currentPosition % BLOCK_SIZE;
 		int bytesToRead = BLOCK_SIZE - blockOffset;
 
-		if (bytesToRead > dataLength - bytesRead)
+		if (bytesToRead > maxToBeRead - bytesRead)
 		{
-			bytesToRead = dataLength - bytesRead;
+			bytesToRead = maxToBeRead - bytesRead;
 		}
 
 		memcpy(buffer + bytesRead, fs->data[fh->currentBlock] + blockOffset, bytesToRead);
@@ -353,7 +368,7 @@ int seek(FileSystem *fs, FileHandle *fh, int offset, int whence)
 		newPos = fh->currentPosition + offset;
 		break;
 	case SEEK_ENDING:
-		newPos = file->size - offset;
+		newPos = file->size + offset;
 		break;
 	default:
 		errno = EINVAL;
